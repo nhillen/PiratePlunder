@@ -10,7 +10,6 @@ import { LoginButton } from './LoginButton'
 import { PlayerProfile } from './PlayerProfile'
 import { Store } from './Store'
 import ConfigManager from './ConfigManager'
-import { DiceTuningLab } from './DiceTuningLab'
 import RulesModal from './RulesModal'
 import { useAuth } from './AuthProvider'
 import { formatGoldCoinsCompact } from '../utils/currency'
@@ -90,7 +89,6 @@ export default function GameApp() {
   const [showProfile, setShowProfile] = useState(false)
   const [showStore, setShowStore] = useState(false)
   const [showConfigManager, setShowConfigManager] = useState(false)
-  const [showDiceTuningLab, setShowDiceTuningLab] = useState(false)
   const [showAdminMenu, setShowAdminMenu] = useState(false)
   const [isSeated, setIsSeated] = useState(false)
   const [isGameAdmin, setIsGameAdmin] = useState(false) // Server-verified admin status
@@ -686,11 +684,11 @@ export default function GameApp() {
           </Button>
           {isGameAdmin && (
             <Button
-              onClick={() => setShowDiceTuningLab(true)}
+              onClick={() => window.location.hash = 'backoffice'}
               variant="secondary"
               size="sm"
             >
-              🎲 Dice Lab
+              🔧 BackOffice
             </Button>
           )}
           <LoginButton gameBankroll={me?.bankroll} />
@@ -1043,92 +1041,22 @@ export default function GameApp() {
                 </div>
               </div>
 
-              {/* Debugging Tools Section */}
+              {/* BackOffice Link */}
               <div className="border-t border-slate-600 pt-4">
-                  <h3 className="text-lg font-semibold mb-3">Debugging Tools</h3>
-                  <div className="grid grid-cols-2 gap-2">
-                    <Button
-                      onClick={() => window.open('/api/hand-history', '_blank')}
-                      variant="secondary"
-                      size="sm"
-                    >
-                      📜 Hand History
-                    </Button>
-                    <Button
-                      onClick={() => window.open('/api/money-flow/transactions/html', '_blank')}
-                      variant="secondary"
-                      size="sm"
-                    >
-                      💰 Money Flow
-                    </Button>
-                    <Button
-                      onClick={() => {
-                        fetch('/api/money-flow/audit')
-                          .then(res => res.json())
-                          .then(data => {
-                            if (data.recentHands && data.recentHands.length > 0) {
-                              const mostRecentHand = data.recentHands[data.recentHands.length - 1];
-                              window.open(`/api/money-flow/hand-summary/${mostRecentHand}/html`, '_blank');
-                            } else {
-                              alert('No recent hands found');
-                            }
-                          })
-                          .catch(() => alert('Failed to get recent hands'));
-                      }}
-                      variant="secondary"
-                      size="sm"
-                    >
-                      🎯 Latest Hand
-                    </Button>
-                    <Button
-                      onClick={() => window.open('/api/cross-reference/validate-recent/10/html', '_blank')}
-                      variant="secondary"
-                      size="sm"
-                    >
-                      🔍 Validate Recent
-                    </Button>
-                    <Button
-                      onClick={() => {
-                        fetch('/api/cross-reference/current-hand')
-                          .then(res => res.json())
-                          .then(data => {
-                            if (data.handId) {
-                              const status = data.isValid ? '✅ VALID' : '❌ INVALID';
-                              const discrepancies = data.discrepancies.length;
-                              alert(`Current Hand: ${data.handId}\nPhase: ${data.phase}\nStatus: ${status}\nDiscrepancies: ${discrepancies}`);
-                            } else {
-                              alert('No active hand to validate');
-                            }
-                          })
-                          .catch(() => alert('Failed to validate current hand'));
-                      }}
-                      variant="secondary"
-                      size="sm"
-                    >
-                      🎯 Validate Current
-                    </Button>
-                    <Button
-                      onClick={async () => {
-                        if (!confirm('⚠️ This will kick ALL players and end any current game. Are you sure?')) return;
-                        try {
-                          const response = await fetch(`${BACKEND_URL}/api/debug/reset-table`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                          });
-                          if (!response.ok) throw new Error('Failed to reset table');
-                          const result = await response.json();
-                          alert(result.message || 'Table reset successfully!');
-                        } catch (err) {
-                          alert('Failed to reset table: ' + (err instanceof Error ? err.message : 'Unknown error'));
-                        }
-                      }}
-                      variant="warning"
-                      size="sm"
-                    >
-                      🗑️ Reset Table
-                    </Button>
-                  </div>
-                </div>
+                <Button
+                  onClick={() => {
+                    setShowAdminMenu(false)
+                    window.location.hash = 'backoffice'
+                  }}
+                  variant="primary"
+                  className="w-full"
+                >
+                  🔧 Open BackOffice
+                </Button>
+                <p className="text-xs text-gray-400 mt-2 text-center">
+                  Hand analysis, debugging tools, and dice lab
+                </p>
+              </div>
 
               <Button
                 onClick={() => setShowAdminMenu(false)}
@@ -1158,13 +1086,7 @@ export default function GameApp() {
             })()}
           />
 
-          {/* Dice Tuning Lab Modal */}
-          <DiceTuningLab
-            isOpen={showDiceTuningLab}
-            onClose={() => setShowDiceTuningLab(false)}
-          />
-
-          {/* Rules Modal */}
+      {/* Rules Modal */}
       <RulesModal
         isOpen={showRules}
         onClose={() => setShowRules(false)}

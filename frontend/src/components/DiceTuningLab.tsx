@@ -1,5 +1,5 @@
-import { getBackendUrl } from '../utils/backendUrl';
 // @ts-nocheck - TODO: Fix type errors with glow property
+import { getBackendUrl } from '../utils/backendUrl';
 import React, { useState, useEffect } from 'react';
 import { renderDice, initDiceSharedDefs, type DiceConfig, type SkinId, type MaterialType, type EffectConfig } from '../utils/diceRendererV2';
 import { normalizeCombo, allowedOptionsFor, type DiceCombo, scoreCombo, rarityFromScore } from '../utils/diceRulesEngine';
