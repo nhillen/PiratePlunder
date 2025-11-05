@@ -1129,7 +1129,6 @@ export default function GameApp() {
                     </Button>
                   </div>
                 </div>
-              )}
 
               <Button
                 onClick={() => setShowAdminMenu(false)}
