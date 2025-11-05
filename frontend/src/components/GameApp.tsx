@@ -1,10 +1,6 @@
 import { useEffect, useState, useMemo } from 'react'
 import { io } from 'socket.io-client'
 import ImprovedGameTable from './ImprovedGameTable'
-import { WarFaireClient } from '@pirate/game-warfaire'
-import '@pirate/game-warfaire/dist/styles/presentation.css'
-import { PokerClient, PokerLobbyList, GameCreator, TablePreview, type GameCreatorConfig } from '@pirate/game-houserules'
-import { FlipzClient } from '@pirate/game-coin-flip'
 import Button from './ui/Button'
 import Panel from './ui/Panel'
 import Badge from './ui/Badge'
@@ -23,7 +19,6 @@ import { getBackendUrl } from '../utils/backendUrl'
 import {
   DEFAULT_COSMETICS
 } from '../config/cosmetics'
-import type { GameType } from './GameSelector'
 
 type Player = {
   id: string
@@ -82,12 +77,7 @@ type LogEntry = {
   isAI: boolean
 }
 
-type GameAppProps = {
-  gameType?: GameType
-  onBackToMenu?: () => void
-}
-
-export default function GameApp({ gameType = 'pirate-plunder', onBackToMenu }: GameAppProps) {
+export default function GameApp() {
   const { user, loading, refreshUser } = useAuth()
   const [connected, setConnected] = useState(false)
   const [me, setMe] = useState<Player | null>(null)
@@ -116,14 +106,6 @@ export default function GameApp({ gameType = 'pirate-plunder', onBackToMenu }: G
     requiredTableStack: number;
     tableMinimumMultiplier: number;
   } | null>(null)
-  // TEMPORARILY DISABLED - Flipz package issues
-  // const [flipzTables, setFlipzTables] = useState<FlipzTable[]>([])
-  // const [selectedTableId, setSelectedTableId] = useState<string | undefined>()
-
-  // HouseRules Poker lobby state
-  const [pokerView, setPokerView] = useState<'lobby' | 'creating' | 'preview' | 'playing'>('lobby')
-  const [pokerTables, setPokerTables] = useState<any[]>([])
-  const [selectedPokerTableId, setSelectedPokerTableId] = useState<string | null>(null)
 
   // Update cosmetics when user changes
   useEffect(() => {
@@ -175,12 +157,11 @@ export default function GameApp({ gameType = 'pirate-plunder', onBackToMenu }: G
       
       // Join with authenticated user's name, cosmetics, and bankroll
       // NOTE: Backend expects bankroll in pennies, auth API returns dollars
-      console.log('📤 Emitting join with:', { name: user.name, bankroll: Math.round(user.bankroll * 100), gameType });
+      console.log('📤 Emitting join with:', { name: user.name, bankroll: Math.round(user.bankroll * 100) });
       socket.emit('join', {
         name: user.name,
         cosmetics: user.cosmetics,
-        bankroll: Math.round(user.bankroll * 100), // Convert dollars to pennies
-        gameType // Pass the selected game type
+        bankroll: Math.round(user.bankroll * 100) // Convert dollars to pennies
       })
     }
 
@@ -233,13 +214,6 @@ export default function GameApp({ gameType = 'pirate-plunder', onBackToMenu }: G
       console.log(`📡 handleGameState CALLED:`, { phase: gameState?.phase, seats: gameState?.seats?.length, timestamp: Date.now() });
       setGame(gameState)
 
-      // For SDK-based games (WarFaire, Flipz, HouseRules), check if we're seated using game.seats (no table_state emitted)
-      if ((gameType === 'warfaire' || gameType === 'flipz' || gameType === 'houserules-poker') && gameState?.seats && socket?.id) {
-        const seated = gameState.seats.some((s: any) => s && s.playerId === socket.id)
-        console.log(`🪑 ${gameType} - Am I seated?`, seated, 'My ID:', socket.id?.slice(0,6))
-        setIsSeated(seated)
-      }
-
       // Clear standUpPending when hand ends or goes back to lobby
       if (standUpPending && (gameState?.phase === 'Lobby' || gameState?.phase === 'HandEnd')) {
         console.log('🚪 Hand ended - clearing stand up pending state')
@@ -258,12 +232,6 @@ export default function GameApp({ gameType = 'pirate-plunder', onBackToMenu }: G
     }
 
     const handleTableState = (state: TableState) => {
-      // CRITICAL: Ignore table_state when playing WarFaire (it doesn't use table_state)
-      if (gameType === 'warfaire') {
-        console.log('⚠️ Ignoring table_state event - playing WarFaire (uses game_state only)')
-        return
-      }
-
       console.log('🪑 TABLE_STATE received:', {
         seatedCount: state.seats.filter(s => s !== null).length,
         seats: state.seats.map((s, i) => s ? `${i}: ${s.name} (${s.id.slice(0,6)})` : `${i}: empty`),
@@ -300,23 +268,6 @@ export default function GameApp({ gameType = 'pirate-plunder', onBackToMenu }: G
     //   setFlipzTables(tables)
     // }
 
-    // HouseRules Poker event handlers
-    const handlePokerTables = (tables: any[]) => {
-      console.log('♠️ Received poker tables:', tables)
-      setPokerTables(tables)
-    }
-
-    const handlePokerTableCreated = (data: { tableId: string }) => {
-      console.log('♠️ Table created:', data.tableId)
-      // Automatically switch to preview of the new table
-      setSelectedPokerTableId(data.tableId)
-      setPokerView('preview')
-      // Request updated tables list
-      if (socket) {
-        socket.emit('poker:get_tables')
-      }
-    }
-
     // Debug: Log all incoming socket events, especially game_state
     const debugListener = (eventName: string, ...args: any[]) => {
       if (eventName === 'game_state') {
@@ -344,9 +295,6 @@ export default function GameApp({ gameType = 'pirate-plunder', onBackToMenu }: G
       socket.on('player_action', handlePlayerAction)
       socket.on('stand_up_pending', handleStandUpPending)
       socket.on('connection_health_check', handleHealthCheck)
-      // socket.on('flipz_tables', handleFlipzTables)  // TEMPORARILY DISABLED
-      socket.on('poker_tables', handlePokerTables)
-      socket.on('poker_table_created', handlePokerTableCreated)
       socket.on('error', handleError)
     }
 
@@ -362,9 +310,6 @@ export default function GameApp({ gameType = 'pirate-plunder', onBackToMenu }: G
       socket.off('player_action', handlePlayerAction)
       socket.off('stand_up_pending', handleStandUpPending)
       socket.off('connection_health_check', handleHealthCheck)
-      // socket.off('flipz_tables', handleFlipzTables)  // TEMPORARILY DISABLED
-      socket.off('poker_tables', handlePokerTables)
-      socket.off('poker_table_created', handlePokerTableCreated)
       socket.off('error', handleError)
     }
 
@@ -381,8 +326,7 @@ export default function GameApp({ gameType = 'pirate-plunder', onBackToMenu }: G
         socket.emit('join', {
           name: user.name,
           cosmetics: user.cosmetics,
-          bankroll: Math.round(user.bankroll * 100), // Convert dollars to pennies
-          gameType
+          bankroll: Math.round(user.bankroll * 100) // Convert dollars to pennies
         })
       }
     }
@@ -396,14 +340,6 @@ export default function GameApp({ gameType = 'pirate-plunder', onBackToMenu }: G
       // socket.disconnect()
     }
   }, [socket, user])
-
-  // Request poker tables when playing HouseRules Poker
-  useEffect(() => {
-    if (gameType === 'houserules-poker' && socket && connected) {
-      console.log('♠️ Requesting poker tables list')
-      socket.emit('poker:get_tables')
-    }
-  }, [gameType, socket, connected])
 
   // DISABLED: Heartbeat was causing UI flashing every 10 seconds
   // TODO: Fix the root cause - why aren't game_state events being received?
@@ -461,8 +397,7 @@ export default function GameApp({ gameType = 'pirate-plunder', onBackToMenu }: G
       socket.emit('join', {
         name: user.name,
         cosmetics: user.cosmetics,
-        bankroll: Math.round(user.bankroll * 100), // Convert dollars to pennies
-        gameType
+        bankroll: Math.round(user.bankroll * 100) // Convert dollars to pennies
       })
     }
   }
@@ -652,47 +587,6 @@ export default function GameApp({ gameType = 'pirate-plunder', onBackToMenu }: G
   }
 
   // HouseRules Poker lobby handlers
-  const handleCreatePokerGame = (config: GameCreatorConfig) => {
-    if (socket) {
-      console.log('♠️ Creating poker table:', config)
-      socket.emit('poker:create_table', config)
-    }
-  }
-
-  const handleSelectPokerTable = (tableId: string) => {
-    console.log('♠️ Selecting poker table:', tableId)
-    setSelectedPokerTableId(tableId)
-    setPokerView('preview')
-  }
-
-  const handleBackToPokerLobby = () => {
-    console.log('♠️ Returning to poker lobby')
-    setPokerView('lobby')
-    setSelectedPokerTableId(null)
-    // Request updated tables list
-    if (socket) {
-      socket.emit('poker:get_tables')
-    }
-  }
-
-  const handlePokerSitDown = (seatIndex: number, buyInAmount: number) => {
-    if (socket && selectedPokerTableId) {
-      console.log('♠️ Sitting down at poker table:', {
-        tableId: selectedPokerTableId,
-        seatIndex,
-        buyInAmount
-      })
-      // Emit with tableId so backend knows which table
-      socket.emit('poker:sit_down', {
-        tableId: selectedPokerTableId,
-        seatIndex,
-        buyInAmount
-      })
-      setPokerView('playing')
-    }
-  }
-
-
   // const handleToggleLock = (diceIndex: number) => {
   //   if (socket) {
   //     socket.emit('lock_toggle', { index: diceIndex })
@@ -728,14 +622,9 @@ export default function GameApp({ gameType = 'pirate-plunder', onBackToMenu }: G
       {/* Header */}
       <div className="absolute top-4 left-4 right-4 flex justify-between items-center z-10">
         <div className="flex items-center gap-3">
-          {onBackToMenu && (
-            <Button onClick={onBackToMenu} variant="ghost" size="sm">
-              ← Back to Menu
-            </Button>
-          )}
           <div>
             <h1 className="text-2xl font-bold">
-              {gameType === 'flipz' ? '🪙 CK Flipz' : gameType === 'warfaire' ? '🎪 War Faire' : gameType === 'houserules-poker' ? '♠️ House Rules Poker' : '🏴‍☠️ Pirate Plunder'}
+              🏴‍☠️ Pirate Plunder
             </h1>
             {connected && me && (
               <div className="text-sm text-gray-300 flex items-center gap-2">
@@ -774,40 +663,35 @@ export default function GameApp({ gameType = 'pirate-plunder', onBackToMenu }: G
               🔧 Admin
             </Button>
           )}
-          {/* PiratePlunder-specific UI elements */}
-          {gameType === 'pirate-plunder' && (
-            <>
-              <Button
-                onClick={() => setShowStore(true)}
-                variant="secondary"
-                size="sm"
-              >
-                🛒 Store
-              </Button>
-              <Button
-                onClick={() => setShowRules(!showRules)}
-                variant="secondary"
-                size="sm"
-              >
-                {showRules ? 'Hide Rules' : 'Rules'}
-              </Button>
-              <Button
-                onClick={() => setShowConfigManager(true)}
-                variant="secondary"
-                size="sm"
-              >
-                ⚙️ Table Config
-              </Button>
-              {isGameAdmin && (
-                <Button
-                  onClick={() => setShowDiceTuningLab(true)}
-                  variant="secondary"
-                  size="sm"
-                >
-                  🎲 Dice Lab
-                </Button>
-              )}
-            </>
+          <Button
+            onClick={() => setShowStore(true)}
+            variant="secondary"
+            size="sm"
+          >
+            🛒 Store
+          </Button>
+          <Button
+            onClick={() => setShowRules(!showRules)}
+            variant="secondary"
+            size="sm"
+          >
+            {showRules ? 'Hide Rules' : 'Rules'}
+          </Button>
+          <Button
+            onClick={() => setShowConfigManager(true)}
+            variant="secondary"
+            size="sm"
+          >
+            ⚙️ Table Config
+          </Button>
+          {isGameAdmin && (
+            <Button
+              onClick={() => setShowDiceTuningLab(true)}
+              variant="secondary"
+              size="sm"
+            >
+              🎲 Dice Lab
+            </Button>
           )}
           <LoginButton gameBankroll={me?.bankroll} />
         </div>
@@ -910,7 +794,7 @@ export default function GameApp({ gameType = 'pirate-plunder', onBackToMenu }: G
 
             {/* Game starts automatically when enough players join */}
 
-            {connected && !isGameAdmin && gameType === 'pirate-plunder' && (
+            {connected && !isGameAdmin && (
               <Panel title="ℹ️ Info">
                 <div className="space-y-3">
                   <p className="text-sm text-gray-400 text-center">
@@ -972,92 +856,7 @@ export default function GameApp({ gameType = 'pirate-plunder', onBackToMenu }: G
 
         {/* Game Table - Always show */}
         <div className="flex-1 px-4">
-          {gameType === 'flipz' ? (
-            <FlipzClient
-              game={game}
-              meId={me?.id || ''}
-              onPlayerAction={handlePlayerGameAction}
-              onSitDown={handleModalSitDown}
-              onStandUp={handleStandUp}
-              isSeated={isSeated}
-              isAdmin={isGameAdmin}
-              variant="coin-flip"
-            />
-          ) : gameType === 'warfaire' ? (
-            <WarFaireClient
-              game={game}
-              meId={me?.id || ''}
-              onPlayerAction={handlePlayerGameAction}
-              onSitDown={handleModalSitDown}
-              onStandUp={handleStandUp}
-              isSeated={isSeated}
-              isAdmin={isGameAdmin}
-            />
-          ) : gameType === 'houserules-poker' ? (
-            (() => {
-              // HouseRules Poker lobby flow
-              if (pokerView === 'lobby') {
-                return (
-                  <PokerLobbyList
-                    tables={pokerTables}
-                    onSelectTable={handleSelectPokerTable}
-                    onCreateGame={() => setPokerView('creating')}
-                    playerBankroll={me?.bankroll || 0}
-                  />
-                )
-              } else if (pokerView === 'creating') {
-                return (
-                  <GameCreator
-                    onCreateGame={handleCreatePokerGame}
-                    onCancel={handleBackToPokerLobby}
-                  />
-                )
-              } else if (pokerView === 'preview' && selectedPokerTableId) {
-                // Find the selected table from the tables list
-                const selectedTable = pokerTables.find(t => t.tableId === selectedPokerTableId)
-                if (!selectedTable) {
-                  return (
-                    <div className="text-center text-white p-8">
-                      <p>Table not found</p>
-                      <Button onClick={handleBackToPokerLobby} className="mt-4">
-                        Back to Lobby
-                      </Button>
-                    </div>
-                  )
-                }
-                return (
-                  <TablePreview
-                    tableId={selectedTable.tableId}
-                    displayName={selectedTable.displayName}
-                    variant={selectedTable.variant}
-                    emoji={selectedTable.emoji}
-                    smallBlind={selectedTable.smallBlind}
-                    bigBlind={selectedTable.bigBlind}
-                    minBuyIn={selectedTable.minBuyIn}
-                    maxBuyIn={selectedTable.maxBuyIn}
-                    maxSeats={selectedTable.maxSeats}
-                    seats={selectedTable.seats || Array(selectedTable.maxSeats).fill(null)}
-                    playerBankroll={me?.bankroll || 0}
-                    onSitDown={handlePokerSitDown}
-                    onBack={handleBackToPokerLobby}
-                  />
-                )
-              } else if (pokerView === 'playing') {
-                return (
-                  <PokerClient
-                    gameState={game}
-                    myPlayerId={me?.id || ''}
-                    onAction={handlePlayerGameAction}
-                    onSitDown={handleModalSitDown}
-                    onStandUp={handleStandUp}
-                    isSeated={isSeated}
-                  />
-                )
-              }
-              return null
-            })()
-          ) : (
-            (() => {
+          {(() => {
               // Create a default empty table if table_state hasn't been received yet
               const defaultTable = {
                 seats: Array(8).fill(null),
@@ -1152,7 +951,6 @@ export default function GameApp({ gameType = 'pirate-plunder', onBackToMenu }: G
         onStandUp={handleStandUp}
         onTopUp={handleTopUp}
         tableRequirements={tableRequirements}
-        gameType={gameType}
         versionInfo={versionInfo}
         buildTimestamp={BUILD_TIMESTAMP}
         debugInfo={{
@@ -1246,9 +1044,8 @@ export default function GameApp({ gameType = 'pirate-plunder', onBackToMenu }: G
                 </div>
               </div>
 
-              {/* Debugging Tools Section - PiratePlunder only */}
-              {gameType === 'pirate-plunder' && (
-                <div className="border-t border-slate-600 pt-4">
+              {/* Debugging Tools Section */}
+              <div className="border-t border-slate-600 pt-4">
                   <h3 className="text-lg font-semibold mb-3">Debugging Tools</h3>
                   <div className="grid grid-cols-2 gap-2">
                     <Button
@@ -1347,11 +1144,9 @@ export default function GameApp({ gameType = 'pirate-plunder', onBackToMenu }: G
         </div>
       )}
 
-      {/* PiratePlunder-specific modals */}
-      {gameType === 'pirate-plunder' && (
-        <>
-          {/* Store Modal */}
-          <Store
+      {/* Modals */}
+      {/* Store Modal */}
+      <Store
             isOpen={showStore}
             onClose={() => setShowStore(false)}
           />
@@ -1372,13 +1167,11 @@ export default function GameApp({ gameType = 'pirate-plunder', onBackToMenu }: G
           />
 
           {/* Rules Modal */}
-          <RulesModal
-            isOpen={showRules}
-            onClose={() => setShowRules(false)}
-            cargoChestValue={game?.cargoChest?.currentValue || 0}
-          />
-        </>
-      )}
+      <RulesModal
+        isOpen={showRules}
+        onClose={() => setShowRules(false)}
+        cargoChestValue={game?.cargoChest?.currentValue || 0}
+      />
 
       {/* Buy-in Modal */}
       {showBuyInModal && (
