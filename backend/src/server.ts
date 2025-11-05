@@ -28,10 +28,12 @@ import { TableConfig as TableConfigType } from './types/table-config';
 import { moneyFlowService, TransactionType, AccountType } from '@pirate/core-engine';
 import { crossReferenceService } from './services/cross-reference-service';
 import * as fs from 'fs';
-import { gameRegistry, GameType } from '@pirate/game-sdk';
-import { CoinFlipGame, CardFlipGame, FLIPZ_TABLES, FlipzTableConfig } from '@pirate/game-coin-flip';
-import { WarFaireGame } from '@pirate/game-warfaire';
-import { HouseRules, TableManager, TableRegistry } from '@pirate/game-houserules';
+// import { gameRegistry, GameType } from '@pirate/game-sdk';
+// import { CoinFlipGame, CardFlipGame, FLIPZ_TABLES, FlipzTableConfig } from '@pirate/game-coin-flip';
+// import { WarFaireGame } from '@pirate/game-warfaire';
+// import { HouseRules, TableManager, TableRegistry } from '@pirate/game-houserules';
+// TODO: Re-enable other games when integrating with multi-game platform
+type GameType = string; // Temporary placeholder
 
 // DEBUG: Log OAuth environment variables
 console.log('🔍 OAuth Environment Check:');
@@ -3022,99 +3024,102 @@ app.delete('/api/skins/custom/:userId/:skinId', async (req: Request, res: Respon
   }
 });
 
-// GameRegistry integration - track which game type each socket is playing
+// TODO: Multi-game support - disabled for PiratePlunder standalone package
+// Placeholder variables to allow code to compile - these features are disabled
 const socketGameType = new Map<string, GameType>();
-
-// Track players for each game type
+const warfaireGame: any = null;
+const houserulesGame: any = null;
 const warfairePlayers = new Map<string, { id: string; name: string; bankroll: number; isAI: boolean; googleId?: string }>();
 const flipzPlayers = new Map<string, { id: string; name: string; bankroll: number; isAI: boolean; googleId?: string; tableId?: string }>();
 const houserulesPlayers = new Map<string, { id: string; name: string; bankroll: number; isAI: boolean; googleId?: string }>();
-
-// Track which table each Flipz player is at
 const playerTableMap = new Map<string, string>(); // playerId -> tableId
+const flipzTables = new Map<string, any>();
+const FLIPZ_TABLES: any[] = [];
+const pokerTableManager: any = null;
+const WarFaireGame: any = null;
 
 // Register game types with the registry
-gameRegistry.registerGameType('coin-flip', CoinFlipGame as any);
-gameRegistry.registerGameType('card-flip', CardFlipGame as any);
-gameRegistry.registerGameType('warfaire', WarFaireGame as any);
-gameRegistry.registerGameType('houserules-poker', HouseRules as any);
+// gameRegistry.registerGameType('coin-flip', CoinFlipGame as any);
+// gameRegistry.registerGameType('card-flip', CardFlipGame as any);
+// gameRegistry.registerGameType('warfaire', WarFaireGame as any);
+// gameRegistry.registerGameType('houserules-poker', HouseRules as any);
 
 // Initialize Flipz tables (multiple instances)
-const flipzTables = new Map<string, any>(); // tableId -> game instance
-console.log('🪙 Initializing Flipz tables...');
-for (const tableConfig of FLIPZ_TABLES) {
-  const gameClass = tableConfig.variant === 'coin-flip' ? CoinFlipGame : CardFlipGame;
-  const rakePercentage = tableConfig.rakePercentage ?? 5;
-  const minBuyInMultiplier = tableConfig.minBuyInMultiplier ?? 5;
-  const gameInstance = new gameClass({
-    minHumanPlayers: 1,
-    targetTotalPlayers: 2,
-    maxSeats: tableConfig.maxSeats,
-    betting: {
-      ante: {
-        mode: 'fixed',
-        amount: tableConfig.ante,
-      },
-    },
-    rakePercentage,
-    minBuyInMultiplier,
-  });
-  flipzTables.set(tableConfig.tableId, gameInstance);
-  console.log(`  ✅ ${tableConfig.displayName} (${tableConfig.tableId}) - Rake: ${rakePercentage}%, Min Buy-in: ${minBuyInMultiplier}x ante`);
-}
+// const flipzTables = new Map<string, any>(); // tableId -> game instance
+// console.log('🪙 Initializing Flipz tables...');
+// for (const tableConfig of FLIPZ_TABLES) {
+//   const gameClass = tableConfig.variant === 'coin-flip' ? CoinFlipGame : CardFlipGame;
+//   const rakePercentage = tableConfig.rakePercentage ?? 5;
+//   const minBuyInMultiplier = tableConfig.minBuyInMultiplier ?? 5;
+//   const gameInstance = new gameClass({
+//     minHumanPlayers: 1,
+//     targetTotalPlayers: 2,
+//     maxSeats: tableConfig.maxSeats,
+//     betting: {
+//       ante: {
+//         mode: 'fixed',
+//         amount: tableConfig.ante,
+//       },
+//     },
+//     rakePercentage,
+//     minBuyInMultiplier,
+//   });
+//   flipzTables.set(tableConfig.tableId, gameInstance);
+//   console.log(`  ✅ ${tableConfig.displayName} (${tableConfig.tableId}) - Rake: ${rakePercentage}%, Min Buy-in: ${minBuyInMultiplier}x ante`);
+// }
 
 // Initialize WarFaire game
-const warfaireGame = gameRegistry.getOrCreateDefaultGame('warfaire');
-console.log('🎪 WarFaire game initialized:', warfaireGame ? 'success' : 'failed');
+// const warfaireGame = gameRegistry.getOrCreateDefaultGame('warfaire');
+// console.log('🎪 WarFaire game initialized:', warfaireGame ? 'success' : 'failed');
 
 // Initialize HouseRules Poker multi-table system
-const pokerRegistry = new TableRegistry();
-const pokerTableManager = new TableManager(pokerRegistry);
+// const pokerRegistry = new TableRegistry();
+// const pokerTableManager = new TableManager(pokerRegistry);
 
 // Create default poker tables
-console.log('♠️ Initializing HouseRules Poker tables...');
-const defaultPokerTables = [
-  {
-    tableId: 'holdem-1',
-    displayName: 'Classic Hold\'em Table 1',
-    variant: 'holdem' as const,
-    rules: {},
-    minBuyIn: 1000, // $10
-    maxBuyIn: 10000, // $100
-    smallBlind: 50, // $0.50
-    bigBlind: 100, // $1
-    maxSeats: 8,
-    emoji: '♠️',
-    description: 'Classic Texas Hold\'em',
-    currentPlayers: 0,
-    isActive: true
-  },
-  {
-    tableId: 'squidz-1',
-    displayName: 'Squidz Game Table 1',
-    variant: 'squidz-game' as const,
-    rules: {},
-    minBuyIn: 5000, // $50
-    maxBuyIn: 20000, // $200
-    smallBlind: 100, // $1
-    bigBlind: 200, // $2
-    maxSeats: 6,
-    emoji: '🦑',
-    description: 'Squidz Game - High Stakes',
-    currentPlayers: 0,
-    isActive: true,
-    squidValue: 500 // $5
-  }
-];
+// console.log('♠️ Initializing HouseRules Poker tables...');
+// const defaultPokerTables = [
+//   {
+//     tableId: 'holdem-1',
+//     displayName: 'Classic Hold\'em Table 1',
+//     variant: 'holdem' as const,
+//     rules: {},
+//     minBuyIn: 1000, // $10
+//     maxBuyIn: 10000, // $100
+//     smallBlind: 50, // $0.50
+//     bigBlind: 100, // $1
+//     maxSeats: 8,
+//     emoji: '♠️',
+//     description: 'Classic Texas Hold\'em',
+//     currentPlayers: 0,
+//     isActive: true
+//   },
+//   {
+//     tableId: 'squidz-1',
+//     displayName: 'Squidz Game Table 1',
+//     variant: 'squidz-game' as const,
+//     rules: {},
+//     minBuyIn: 5000, // $50
+//     maxBuyIn: 20000, // $200
+//     smallBlind: 100, // $1
+//     bigBlind: 200, // $2
+//     maxSeats: 6,
+//     emoji: '🦑',
+//     description: 'Squidz Game - High Stakes',
+//     currentPlayers: 0,
+//     isActive: true,
+//     squidValue: 500 // $5
+//   }
+// ];
 
-defaultPokerTables.forEach(tableConfig => {
-  pokerRegistry.addTable(tableConfig as any);
-  console.log(`  ✅ ${tableConfig.displayName} (${tableConfig.tableId})`);
-});
+// defaultPokerTables.forEach(tableConfig => {
+//   pokerRegistry.addTable(tableConfig as any);
+//   console.log(`  ✅ ${tableConfig.displayName} (${tableConfig.tableId})`);
+// });
 
 // Keep the legacy single instance for backward compatibility (will be deprecated)
-const houserulesGame = gameRegistry.getOrCreateDefaultGame('houserules-poker');
-console.log('♠️ HouseRules Poker tables initialized');
+// const houserulesGame = gameRegistry.getOrCreateDefaultGame('houserules-poker');
+// console.log('♠️ HouseRules Poker tables initialized');
 
 // Generic SDK Game Router - consolidates game-specific logic
 interface SDKGameConfig {
@@ -3356,15 +3361,15 @@ io.on('connection', (socket) => {
       const warfaireState = warfaireGame.getGameState();
       if (warfaireState && warfaireState.seats) {
         console.log(`🎪 Looking for WarFaire game seat with googleId: ${userGoogleId}`);
-        console.log(`🎪 Current WarFaire seats:`, warfaireState.seats.map(s => s ? `${s.name}(playerId: ${s.playerId}, isAI: ${s.isAI})` : 'empty'));
+        console.log(`🎪 Current WarFaire seats:`, warfaireState.seats.map((s: any) => s ? `${s.name}(playerId: ${s.playerId}, isAI: ${s.isAI})` : 'empty'));
 
         // Try to find seat by googleId stored in warfairePlayers first
-        let warfaireSeat = warfaireState.seats.find(seat => seat && warfairePlayers.get(seat.playerId)?.googleId === userGoogleId);
+        let warfaireSeat = warfaireState.seats.find((seat: any) => seat && warfairePlayers.get(seat.playerId)?.googleId === userGoogleId);
 
         // If not found, try to find by matching name (fallback for when warfairePlayers is cleared)
         if (!warfaireSeat) {
           console.log(`🎪 Fallback: looking for WarFaire seat with name "${player.name}"`);
-          warfaireSeat = warfaireState.seats.find(seat => seat && !seat.isAI && (
+          warfaireSeat = warfaireState.seats.find((seat: any) => seat && !seat.isAI && (
             seat.name === player.name ||
             seat.name === `${player.name} (disconnected)` ||
             seat.name.startsWith(player.name)
@@ -4372,7 +4377,7 @@ io.on('connection', (socket) => {
         state.currentFair = 0;
         state.currentRound = 0;
         // Keep players seated but reset their game state
-        state.seats.forEach(seat => {
+        state.seats.forEach((seat: any) => {
           if (seat) {
             seat.hand = [];
             seat.playedCards = [];
@@ -4598,7 +4603,7 @@ io.on('connection', (socket) => {
       console.log(`🎪 Handling WarFaire action: ${payload.action} from ${seat.name}`);
 
       // Call the WarFaire game's handlePlayerAction method
-      (warfaireGame as WarFaireGame).handlePlayerAction(playerId, payload.action, payload.data);
+      (warfaireGame as any).handlePlayerAction(playerId, payload.action, payload.data);
 
       // Broadcast updated game state
       const updatedState = warfaireGame.getGameState();
@@ -4965,7 +4970,7 @@ io.on('connection', (socket) => {
     if (warfaireGame && player && !player.isAI) {
       const warfaireState = warfaireGame.getGameState();
       if (warfaireState && warfaireState.phase !== 'Lobby') {
-        const disconnectedSeat = warfaireState.seats.find(s => s && s.playerId === socket.id);
+        const disconnectedSeat = warfaireState.seats.find((s: any) => s && s.playerId === socket.id);
         if (disconnectedSeat) {
           console.log(`🎪 ${player.name} disconnected during WarFaire game phase ${warfaireState.phase}`);
 
