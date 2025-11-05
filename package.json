@@ -1,0 +1,33 @@
+{
+  "name": "pirate-games-monorepo",
+  "private": true,
+  "version": "2025.11.0-5.555",
+  "workspaces": [
+    "games/*/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "./setup-network.sh && concurrently \"npm run dev --workspace @pirate/game-pirate-plunder-backend\" \"npm run dev --workspace @pirate/game-pirate-plunder-frontend\"",
+    "dev:win": "./setup-network.sh && concurrently \"npm.cmd run dev --workspace @pirate/game-pirate-plunder-backend\" \"npm.cmd run dev --workspace @pirate/game-pirate-plunder-frontend\"",
+    "build": "npm run build:frontend && npm run build:backend && mkdir -p games/pirate-plunder/backend/dist/public && cp -r games/pirate-plunder/frontend/dist/* games/pirate-plunder/backend/dist/public/",
+    "build:frontend": "npm run build --workspace @pirate/game-pirate-plunder-frontend",
+    "build:backend": "npm run build --workspace @pirate/game-pirate-plunder-backend",
+    "start:prod": "NODE_ENV=production node games/pirate-plunder/backend/dist/server.js",
+    "deploy:prepare": "npm run build && cp -r games/pirate-plunder/backend/dist deploy/ && cp -r games/pirate-plunder/frontend/dist deploy/frontend/",
+    "kill-ports": "kill-port 3001 5173",
+    "test:all": "./test-all.sh",
+    "test:backend": "npm run test --workspace @pirate/game-pirate-plunder-backend",
+    "test:frontend": "npm run test:run --workspace @pirate/game-pirate-plunder-frontend",
+    "test:integration": "npm run test:game --workspace @pirate/game-pirate-plunder-backend",
+    "publish:game": "scripts/publish-game.sh"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.0",
+    "kill-port": "^2.0.1"
+  },
+  "dependencies": {
+    "@pirate/game-houserules": "^0.2.6",
+    "@pirate/game-sdk": "^0.1.5",
+    "@pirate/game-warfaire": "^0.2.113"
+  }
+}
