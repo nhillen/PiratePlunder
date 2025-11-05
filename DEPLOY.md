@@ -1,147 +1,141 @@
-# AnteTown Platform Deployment Guide
+# PiratePlunder Game Deployment
 
-## Current Deployment Method: Manual via Tailscale SSH
+**⚠️ IMPORTANT: This game is NOT deployed standalone.**
 
-All deployments are done manually via Tailscale SSH. This is the only supported deployment method.
-
-### Prerequisites
-- Tailscale installed and authenticated
-- Access to `deploy@vps-0b87e710.tail751d97.ts.net`
-- Code committed and pushed to `main` branch on GitHub
+PiratePlunder is a game package designed for the **AnteTown gaming platform**. Deployment is handled at the platform level, not from this repository.
 
 ---
 
-## Deployment Steps
+## How Deployment Works
 
-Run these commands from your local machine:
-
-### 1. Pull Latest Code
-```bash
-tailscale ssh deploy@vps-0b87e710.tail751d97.ts.net "cd /opt/AnteTown && git pull origin main"
-```
-
-### 2. Update Root Dependencies
-```bash
-tailscale ssh deploy@vps-0b87e710.tail751d97.ts.net "cd /opt/AnteTown && npm install"
-```
-
-### 3. Build Frontend
-```bash
-tailscale ssh deploy@vps-0b87e710.tail751d97.ts.net "cd /opt/AnteTown/games/pirate-plunder/frontend && npm install && npm run build"
-```
-
-### 4. Copy Frontend to Backend Public Folder
-```bash
-tailscale ssh deploy@vps-0b87e710.tail751d97.ts.net "cd /opt/AnteTown && rm -rf games/pirate-plunder/backend/dist/public/* && mkdir -p games/pirate-plunder/backend/dist/public && cp -r games/pirate-plunder/frontend/dist/* games/pirate-plunder/backend/dist/public/"
-```
-
-### 5. Build Backend
-```bash
-tailscale ssh deploy@vps-0b87e710.tail751d97.ts.net "cd /opt/AnteTown/games/pirate-plunder/backend && npm install && npx tsc -p ."
-```
-
-### 6. Restart Service
-```bash
-tailscale ssh deploy@vps-0b87e710.tail751d97.ts.net "sudo systemctl restart AnteTown"
-```
-
-### 7. Verify Deployment
-```bash
-curl -s https://antetown.com/api/deploy-info | jq '.'
-```
-
-Check that:
-- `uptime` is low (service just restarted)
-- Service returns valid JSON
-- No errors in the response
+1. **Make changes** to this game repository and commit/push to GitHub
+2. **AnteTown platform** pulls changes (via `file:` dependency or package registry)
+3. **Platform deployment** builds and deploys all integrated games together
+4. **Game goes live** at https://antetown.com/#game/pirate-plunder
 
 ---
 
-## Quick Copy-Paste (All Steps)
+## Deploying Changes to Production
+
+### Quick Process
 
 ```bash
-# Full deployment - copy all these lines at once
-tailscale ssh deploy@vps-0b87e710.tail751d97.ts.net "cd /opt/AnteTown && git pull origin main"
-tailscale ssh deploy@vps-0b87e710.tail751d97.ts.net "cd /opt/AnteTown && npm install"
-tailscale ssh deploy@vps-0b87e710.tail751d97.ts.net "cd /opt/AnteTown/games/pirate-plunder/frontend && npm install && npm run build"
-tailscale ssh deploy@vps-0b87e710.tail751d97.ts.net "cd /opt/AnteTown && rm -rf games/pirate-plunder/backend/dist/public/* && mkdir -p games/pirate-plunder/backend/dist/public && cp -r games/pirate-plunder/frontend/dist/* games/pirate-plunder/backend/dist/public/"
-tailscale ssh deploy@vps-0b87e710.tail751d97.ts.net "cd /opt/AnteTown/games/pirate-plunder/backend && npm install && npx tsc -p ."
-tailscale ssh deploy@vps-0b87e710.tail751d97.ts.net "sudo systemctl restart AnteTown"
-curl -s https://antetown.com/api/deploy-info | jq '.'
+# 1. In this repo: Commit and push your changes
+git add .
+git commit -m "Your changes"
+git push
+
+# 2. Switch to AnteTown platform repository
+cd ../PiratePlunder-new
+
+# 3. If using file: dependency, pull latest
+npm install  # Re-links file: dependencies
+
+# 4. Deploy platform (which includes your game changes)
+tailscale ssh deploy@vps-0b87e710.tail751d97.ts.net \
+  "cd /opt/AnteTown && git pull origin main && make build && sudo systemctl restart AnteTown"
+
+# 5. Verify deployment
+curl -s https://antetown.com/api/deploy-info | jq '{commitHash, buildVersion, timestamp}'
+```
+
+### Detailed Instructions
+
+See the **complete deployment guide** in the platform repository:
+
+**📖 [AnteTown Platform DEPLOY.md](https://github.com/drybrushgames/PiratePlunder-new/blob/main/DEPLOY.md)**
+
+That document contains:
+- Full step-by-step deployment process
+- Troubleshooting guides
+- Post-deployment verification steps
+- Production environment configuration
+- OAuth and database setup
+
+---
+
+## Development Workflow
+
+### Local Development
+
+Test your changes locally using the standalone dev server:
+
+```bash
+# In this repo
+npm install
+
+# Start backend
+(cd backend && npm run dev)
+
+# Start frontend (in new terminal)
+(cd frontend && npm run dev)
+
+# Open http://localhost:5173
+```
+
+### Integration Testing with Platform
+
+Test with the full AnteTown platform locally:
+
+```bash
+# 1. Build your changes
+(cd backend && npm run build)
+(cd frontend && npm run build)
+
+# 2. Switch to platform repo and start platform
+cd ../PiratePlunder-new
+npm install
+npm run dev
+
+# 3. Open http://localhost:3001/#game/pirate-plunder
 ```
 
 ---
 
 ## Production URLs
 
-- **Primary**: https://antetown.com
-- **Internal (Tailscale)**: http://vps-0b87e710.tail751d97.ts.net:3001
-- **Legacy**: https://vps-0b87e710.tail751d97.ts.net
+- **Primary**: https://antetown.com/#game/pirate-plunder
+- **Internal (Tailscale)**: http://vps-0b87e710.tail751d97.ts.net:3001/#game/pirate-plunder
 
 ---
 
-## Troubleshooting
+## Package Publishing (Optional)
 
-### Service Won't Start
+If using a private npm registry like Verdaccio:
+
 ```bash
-# Check service logs
-tailscale ssh deploy@vps-0b87e710.tail751d97.ts.net "sudo journalctl -u AnteTown -n 50"
+# Bump version
+npm version patch  # or minor, or major
 
-# Check service status
-tailscale ssh deploy@vps-0b87e710.tail751d97.ts.net "sudo systemctl status AnteTown"
+# Publish to registry
+npm publish
+
+# Update platform to use new version
+cd ../PiratePlunder-new
+npm install @pirate/game-pirate-plunder@latest
 ```
 
-### Disk Space Issues
-```bash
-# Check disk usage
-tailscale ssh deploy@vps-0b87e710.tail751d97.ts.net "df -h"
-
-# Clean old journal logs (keeps last 7 days)
-tailscale ssh deploy@vps-0b87e710.tail751d97.ts.net "sudo journalctl --vacuum-time=7d"
-```
-
-### Frontend Not Updating
-- Verify frontend build completed successfully in step 3
-- Verify files were copied in step 4
-- Hard refresh browser (Ctrl+Shift+R)
-- Check browser console for errors
-
-### Backend Compilation Errors
-```bash
-# Check TypeScript compilation output
-tailscale ssh deploy@vps-0b87e710.tail751d97.ts.net "cd /opt/AnteTown/games/pirate-plunder/backend && npx tsc -p . 2>&1 | head -50"
-```
+**Note**: Currently using `file:` dependency for local development, which automatically picks up changes.
 
 ---
 
-## Important Notes
+## Why Can't I Deploy This Repo Directly?
 
-### OAuth Credentials
-**CRITICAL**: The production `.env` file contains OAuth credentials that must NOT be overwritten:
-- `GOOGLE_CLIENT_ID=4580273885-irv1ae2vs7i00so08j7j5caa9mi3lb2o.apps.googleusercontent.com`
-- `GOOGLE_CLIENT_SECRET=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`
-- **OAuth Callback URL**: https://antetown.com/auth/google/callback
+This repository is a **game package**, not a complete application. It requires:
 
-The deployment process does NOT touch the `.env` file. If you need to update environment variables, do it manually via SSH.
+- **Authentication** from AnteTown platform (Google OAuth)
+- **Database** from AnteTown platform (PostgreSQL + Prisma)
+- **User Management** from AnteTown platform (bankrolls, profiles, sessions)
+- **Socket.IO Server** from AnteTown platform (hosts game connections)
 
-### Table Configuration
-- Production table configs are stored in `/opt/AnteTown/backend/config/table-config.json`
-- This file is NOT tracked in git
-- Deployment does NOT overwrite this file
-- Changes made via ConfigManager UI persist across deployments
+The AnteTown platform provides all these services and calls `initializePiratePlunder(io)` to start the game.
 
-### Cache Busting
-- Frontend builds include timestamps in filenames for cache busting
-- Server serves `no-cache` headers during development
-- Hard refresh if you don't see changes immediately
+For more details, see the [Platform Integration section in README.md](./README.md#-what-is-this).
 
 ---
 
-## Pre-Deployment Checklist
+## Questions?
 
-Before deploying, ensure:
-- [ ] Code is committed and pushed to `main` branch
-- [ ] TypeScript compiles locally: `npm exec --workspace @pirate/game-pirate-plunder-backend tsc -- --noEmit`
-- [ ] Frontend compiles locally: `npm exec --workspace @pirate/game-pirate-plunder-frontend tsc -- --noEmit`
-- [ ] Local testing completed: `npm run dev`
-- [ ] Build test passes: `make build` (from project root)
+- **Platform deployment**: See [AnteTown DEPLOY.md](https://github.com/drybrushgames/PiratePlunder-new/blob/main/DEPLOY.md)
+- **Game development**: See [CLAUDE.md](./CLAUDE.md)
+- **Architecture**: See [README.md](./README.md)
