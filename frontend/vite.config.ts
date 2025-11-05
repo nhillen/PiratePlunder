@@ -1,9 +1,18 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import { resolve } from 'path'
+import dts from 'vite-plugin-dts'
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    dts({
+      insertTypesEntry: true,
+      include: ['src/index.ts', 'src/components/**/*.tsx'],
+      exclude: ['src/test/**', 'src/**/*.test.tsx']
+    })
+  ],
   optimizeDeps: {
     include: ['@pirate/game-warfaire']
   },
@@ -12,20 +21,25 @@ export default defineConfig({
     port: 5173
   },
   build: {
-    // Force unique filenames for all assets to prevent caching issues
+    lib: {
+      entry: resolve(__dirname, 'src/index.ts'),
+      name: 'PiratePlunderClient',
+      formats: ['es'],
+      fileName: 'index'
+    },
+    // Enable type declarations
+    outDir: 'dist',
+    sourcemap: true,
     rollupOptions: {
+      external: ['react', 'react-dom', 'socket.io-client'],
       output: {
-        // Add timestamp to chunk names for better cache busting
-        entryFileNames: `assets/[name]-[hash]-${Date.now()}.js`,
-        chunkFileNames: `assets/[name]-[hash]-${Date.now()}.js`,
-        assetFileNames: (assetInfo) => {
-          const name = assetInfo.name || 'asset'
-          const ext = name.split('.').pop()
-          return `assets/[name]-[hash]-${Date.now()}.${ext}`
+        globals: {
+          react: 'React',
+          'react-dom': 'ReactDOM',
+          'socket.io-client': 'io'
         }
       }
     },
-    // Clear output directory on build
     emptyOutDir: true
   }
 })
