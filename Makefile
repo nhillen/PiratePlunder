@@ -1,8 +1,7 @@
 .PHONY: build clean install dev test install-prod build-prod
 
-GAME_DIR=games/pirate-plunder
-BACKEND_DIR=$(GAME_DIR)/backend
-FRONTEND_DIR=$(GAME_DIR)/frontend
+BACKEND_DIR=backend
+FRONTEND_DIR=frontend
 
 # Build both frontend and backend
 build:
@@ -16,11 +15,6 @@ build:
 	npm version $(NEW_VERSION) --no-git-tag-version || true
 	cd $(BACKEND_DIR) && npm version $(NEW_VERSION) --no-git-tag-version || true
 	cd $(FRONTEND_DIR) && npm version $(NEW_VERSION) --no-git-tag-version || true
-
-	@echo "Building packages..."
-	cd packages/game-sdk && npm install && npm run build
-	cd packages/game-coin-flip && npm install && npm run build
-	cd packages/core-engine && npm install && npm run build
 
 	@echo "Installing frontend dependencies..."
 	cd $(FRONTEND_DIR) && npm install
