@@ -938,8 +938,7 @@ export default function GameApp() {
                   tableRequirements={tableRequirements}
                 />
               );
-            })()
-          )}
+            })()}
         </div>
       </div>
 
